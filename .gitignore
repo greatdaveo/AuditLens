@@ -28,6 +28,8 @@ MANIFEST
 
 BUILD_STEPS.md
 PROJECT_GUIDE.md
+data/raw/
+data/processed/
 
 # PyInstaller
 #   Usually these files are written by a python script from a template
