@@ -30,6 +30,7 @@ BUILD_STEPS.md
 PROJECT_GUIDE.md
 data/raw/
 data/processed/
+docs/learning-log.md
 
 # PyInstaller
 #   Usually these files are written by a python script from a template
