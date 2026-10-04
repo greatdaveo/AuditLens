@@ -7,13 +7,13 @@ from ledger_audit.validate import trial_balance, unbalanced_entries
 
 def main() -> None:
     ledger = generate_ledger(
-        n_entries=2000,
+        n_entries=180_000,
         seed=42,
         start=datetime(2024, 1, 1),
-        days=365,
+        days=730,
     )
 
-    output_path = Path("data/raw/ledger_v1.csv")
+    output_path = Path("data/raw/ledger_v2.csv")
     ledger.to_csv(output_path, index=False)
 
     unbalanced = unbalanced_entries(ledger)

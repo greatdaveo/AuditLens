@@ -12,6 +12,7 @@ ACCOUNTS = [
     Account(1000, "Bank", "asset"),
     Account(1100, "Trade receivables", "asset"),
     Account(1200, "VAT recoverable", "asset"),
+    Account(1300, "Accumulated depreciation", "asset"),
     Account(2000, "Trade payables", "liability"),
     Account(2100, "VAT payable", "liability"),
     Account(2200, "Accruals", "liability"),

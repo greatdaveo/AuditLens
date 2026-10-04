@@ -53,3 +53,64 @@ def test_only_payroll_user_posts_payroll(ledger):
 
 def test_trial_balance_nets_to_zero(ledger):
     assert trial_balance(ledger)["balance_pence"].sum() == 0
+
+
+def test_no_payment_without_open_invoice():
+    ledger = generate_ledger(
+        n_entries=100,
+        seed=7,
+        start=pd.Timestamp("2024-01-01").to_pydatetime(),
+        days=30,
+    )
+    assert not (
+        (ledger["description"] == "Supplier payment")
+        & (ledger["vendor_id"] == "")
+    ).any()
+    assert not (
+        (ledger["description"] == "Customer receipt")
+        & (ledger["customer_id"] == "")
+    ).any()
+
+
+def test_invoice_closed_once_paid():
+    ledger = generate_ledger(
+        n_entries=200,
+        seed=11,
+        start=pd.Timestamp("2024-01-01").to_pydatetime(),
+        days=60,
+    )
+
+    sale_invoice_ids = []
+    purchase_invoice_ids = []
+
+    for _, row in ledger.iterrows():
+        if row["description"] == "Sale":
+            sale_invoice_ids.append(row["customer_id"])
+        if row["description"] == "Expense":
+            purchase_invoice_ids.append(row["vendor_id"])
+
+    assert len(set(sale_invoice_ids)) >= 1
+    assert len(set(purchase_invoice_ids)) >= 1
+
+
+def test_month_end_entries_present():
+    ledger = generate_ledger(
+        n_entries=500,
+        seed=123,
+        start=pd.Timestamp("2024-01-01").to_pydatetime(),
+        days=365,
+    )
+
+    months = set(ledger["posted_at"].dt.month)
+    for month in months:
+        depreciation_rows = ledger.loc[
+            (ledger["description"] == "Depreciation")
+            & (ledger["posted_at"].dt.month == month)
+        ]
+        accrual_rows = ledger.loc[
+            (ledger["description"] == "Accrual")
+            & (ledger["posted_at"].dt.month == month)
+        ]
+
+        assert len(depreciation_rows) >= 1
+        assert len(accrual_rows) >= 1
