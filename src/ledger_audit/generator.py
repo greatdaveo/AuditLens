@@ -37,6 +37,11 @@ SALARY_PENCE: dict[str, int] = {
     "U08": 600000,
 }
 
+SALES_AMOUNT_MU = 6.0
+SALES_AMOUNT_SIGMA = 1.0
+EXPENSE_AMOUNT_MU = 11.35
+EXPENSE_AMOUNT_SIGMA = 1.45
+
 
 def generate_ledger(n_entries: int, seed: int, start: datetime, days: int) -> pd.DataFrame:
     rng = random.Random(seed)
@@ -120,7 +125,6 @@ def generate_ledger(n_entries: int, seed: int, start: datetime, days: int) -> pd
         user_id = rng.choice(USERS)
         approver_id = rng.choice(APPROVERS)
         assert approver_id != user_id
-        amount_pence = max(100, int(rng.lognormvariate(6.0, 1.0) * 100))
 
         valid_events = ["sale", "expense"]
         if open_sales_invoices:
@@ -130,6 +134,8 @@ def generate_ledger(n_entries: int, seed: int, start: datetime, days: int) -> pd
         event_type = rng.choice(valid_events)
 
         if event_type == "sale":
+            amount_pence = max(100, int(rng.lognormvariate(
+                SALES_AMOUNT_MU, SALES_AMOUNT_SIGMA) * 100))
             customer_id = rng.choice(CUSTOMERS_IDS)
             invoice = {
                 "invoice_id": next_invoice_id,
@@ -148,6 +154,8 @@ def generate_ledger(n_entries: int, seed: int, start: datetime, days: int) -> pd
                 (4000, 0, amount_pence),
             ]
         elif event_type == "expense":
+            amount_pence = max(100, int(rng.lognormvariate(
+                EXPENSE_AMOUNT_MU, EXPENSE_AMOUNT_SIGMA) * 100))
             vendor_id = rng.choice(VENDOR_IDS)
             invoice = {
                 "invoice_id": next_invoice_id,
