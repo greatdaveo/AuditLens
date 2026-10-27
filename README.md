@@ -10,10 +10,10 @@ A general ledger records an organisation's financial activity. Each business eve
 
 For example, a sale on credit has two lines:
 
-| Account | Debit | Credit |
-|---|---:|---:|
-| Trade receivables | Amount of sale | |
-| Sales revenue | | Amount of sale |
+| Account           |          Debit |         Credit |
+| ----------------- | -------------: | -------------: |
+| Trade receivables | Amount of sale |                |
+| Sales revenue     |                | Amount of sale |
 
 The debit and credit totals must be equal. This is called double-entry bookkeeping. In AuditLens, `entry_id` identifies the journal entry, while each row in the generated ledger represents one journal line.
 
@@ -30,6 +30,12 @@ The project is being built in stages:
 5. Explore the data, build audit rules and features, and compare detection approaches.
 
 The anomaly-detection and machine-learning work is still in progress. The goal is to test methods against known, deliberately created examples, not to claim that a model can identify real fraud.
+
+## Ledger generation and anomaly injection
+
+AuditLens generates balanced synthetic journal entries for business events such as sales, expenses, payments, and payroll. An anomaly-injection script can create examples such as duplicate payments, entries posted at unusual times, self-approved entries, round-number expenses, and expenses posted to alternate accounts.
+
+Anomaly labels are stored separately from the ledger. Each label identifies the entry and records whether it is anomalous and, if so, its anomaly type. Keeping these labels separate prevents the known answers from being mixed into data used for detection.
 
 ## Current project status
 
@@ -54,10 +60,10 @@ The generator samples an amount with `rng.lognormvariate(mu, sigma)`, multiplies
 
 The current settings are separate for sales and expenses:
 
-| Event type | `mu` | `sigma` | Reason |
-|---|---:|---:|---|
-| Sales | 6.0 | 1.0 | Kept at the original settings; the Defra spending data does not contain sales |
-| Expenses | 11.35 | 1.45 | Adjusted using the Defra median and 95th percentile |
+| Event type |  `mu` | `sigma` | Reason                                                                        |
+| ---------- | ----: | ------: | ----------------------------------------------------------------------------- |
+| Sales      |   6.0 |     1.0 | Kept at the original settings; the Defra spending data does not contain sales |
+| Expenses   | 11.35 |    1.45 | Adjusted using the Defra median and 95th percentile                           |
 
 The expense settings bring the synthetic median and 95th percentile close to the values in the selected real transactions. The synthetic coefficient of variation is still lower, which means the synthetic amounts have less relative variation overall. Matching all three statistics with one lognormal distribution would require a trade-off.
 
@@ -74,12 +80,12 @@ The profiling analysis uses six Defra spending-over-£25,000 publications:
 
 The six files contain 5,513 rows. Source amounts are converted to integer pence for analysis. The positive real transactions and all synthetic expense entries compare as follows:
 
-| Metric | Positive Defra transactions (£) | Synthetic expense entries (£) |
-|---|---:|---:|
-| Count | 5,490 | 45,050 |
-| Median | 84,867.50 | 84,631.82 |
-| 95th percentile | 916,157.23 | 909,955.14 |
-| Coefficient of variation | 10.486 | 2.573 |
+| Metric                   | Positive Defra transactions (£) | Synthetic expense entries (£) |
+| ------------------------ | ------------------------------: | ----------------------------: |
+| Count                    |                           5,490 |                        45,050 |
+| Median                   |                       84,867.50 |                     84,631.82 |
+| 95th percentile          |                      916,157.23 |                    909,955.14 |
+| Coefficient of variation |                          10.486 |                         2.573 |
 
 This is a benchmark rather than a like-for-like comparison. Defra data includes government grants and capital spending, while the synthetic ledger represents a simplified company. The Defra publications are also subject to a spending threshold, so they do not represent all government spending.
 
@@ -101,3 +107,4 @@ python -m venv .venv
 source .venv/bin/activate
 python -m pip install -r requirements.txt
 python -m pip install -e .
+```
