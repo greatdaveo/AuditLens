@@ -37,6 +37,12 @@ AuditLens generates balanced synthetic journal entries for business events such 
 
 Anomaly labels are stored separately from the ledger. Each label identifies the entry and records whether it is anomalous and, if so, its anomaly type. Keeping these labels separate prevents the known answers from being mixed into data used for detection.
 
+## Audit rules and evaluation
+
+AuditLens applies accounting rules to flag journal entries that may deserve review. The rules look for unusual leading-digit patterns, duplicate payments, expenses near an approval limit, unusual posting times, self-approval, and round-number amounts. Each finding includes the entry ID, the rule that flagged it, and a human-readable reason.
+
+The rule results are compared with the separate synthetic anomaly labels using precision, recall, and a rule-by-anomaly-type table. These metrics describe performance on the generated examples; they are not evidence of real-world fraud-detection performance.
+
 ## Current project status
 
 The generator creates a two-year ledger using a fixed random seed. With the current settings, it creates 180,000 journal entries and 405,050 journal lines. The generated entries balance.
