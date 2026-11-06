@@ -43,6 +43,18 @@ AuditLens applies accounting rules to flag journal entries that may deserve revi
 
 The rule results are compared with the separate synthetic anomaly labels using precision, recall, and a rule-by-anomaly-type table. These metrics describe performance on the generated examples; they are not evidence of real-world fraud-detection performance.
 
+## Features
+
+Journal lines are collapsed to one row per entry, and each entry gets numeric features: amount (raw and log), number of lines, posting hour, weekend and month-end flags, and one-hot user and weekday columns. Four behaviour features compare an entry with the same user's or vendor's earlier entries: how far the amount is from the user's usual amounts, how typical the posting hour is for that user, how long since the user last posted to the same accounts, and how many earlier entries the vendor has. These use only earlier entries, so a feature never depends on data from after the entry was posted. Each feature is described in [the feature reference](docs/features.md).
+
+The feature table contains no label columns. It also has no approver or account-code features, so it carries no direct signal for self-approved entries or entries posted to an alternate expense account.
+
+## Models
+
+Four models score each entry, with higher scores meaning more unusual: logistic regression, an isolation forest, XGBoost, and an autoencoder. Logistic regression and XGBoost learn from the labels and weight the rare anomaly class. The isolation forest is unsupervised. The autoencoder is trained on normal entries only and scores an entry by how poorly it can reconstruct it.
+
+Entries are split by time: the first 70% of the date range is used for training, the next 15% for validation, and the last 15% for testing. The test split is kept for the final evaluation. Scores for every entry are written to `data/processed/scores.csv` with a column showing each entry's split.
+
 ## Current project status
 
 The generator creates a two-year ledger using a fixed random seed. With the current settings, it creates 180,000 journal entries and 405,050 journal lines. The generated entries balance.

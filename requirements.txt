@@ -3,3 +3,6 @@ numpy
 matplotlib
 pytest
 ipykernel
+scikit-learn
+xgboost
+torch
