@@ -1,128 +1,154 @@
-# AuditLens
+# AuditLens: Anomaly Detection for Financial Ledgers
 
-AuditLens is a learning and research project about finding unusual activity in general-ledger data. It uses accounting rules and, in later stages, machine-learning methods to flag entries for review and explain why they look unusual.
+## Problem Statement
 
-The project starts with a reproducible synthetic ledger. It also profiles public spending data to help assess whether the synthetic expense amounts are plausible. This is an educational prototype: it is not a production audit system, and its results are not evidence of real-world fraud detection.
+Financial audits rely on manual testing to catch fraud and errors in ledger entries. Rule-based audit procedures (e.g., "flag expenses above £10,000") are:
+- **Slow**: Auditors manually review thousands of entries
+- **Rigid**: New fraud patterns require writing new rules
+- **Reactive**: They catch known patterns, not novel schemes
 
-## What is a general ledger?
+**AuditLens** combines rule-based detection with machine learning to automatically flag suspicious ledger entries, enabling auditors to focus on high-risk items.
 
-A general ledger records an organisation's financial activity. Each business event is recorded as a **journal entry**, which contains one or more **journal lines**.
+---
 
-For example, a sale on credit has two lines:
+## Approach
 
-| Account           |          Debit |         Credit |
-| ----------------- | -------------: | -------------: |
-| Trade receivables | Amount of sale |                |
-| Sales revenue     |                | Amount of sale |
+AuditLens uses a **hybrid detection model** combining domain expertise with machine learning:
 
-The debit and credit totals must be equal. This is called double-entry bookkeeping. In AuditLens, `entry_id` identifies the journal entry, while each row in the generated ledger represents one journal line.
+1. **Synthetic data generation** (Stages 1–4): Create realistic journal entries with known fraud patterns injected at calibrated rates
+2. **Rule-based audit tests** (Stage 6): Encode domain rules (e.g., "odd timing," "duplicate payments," "below-limit structuring")
+3. **Feature engineering** (Stage 7): Build 20+ features capturing accounting patterns, user behavior, and temporal anomalies
+4. **Machine learning models** (Stage 8): Train 4 models—Logistic Regression, Isolation Forest, XGBoost, and Autoencoder—to detect patterns beyond rules
+5. **Evaluation** (Stage 9): Compare methods on PR-AUC, precision@k, and recall@k; break down performance by fraud type
+6. **Explainability** (Stage 10): Use SHAP to explain why entries are flagged (which features drove the decision)
 
-Money is stored as integer pence rather than floating-point pounds. For example, £12.34 is stored as `1234` pence. This avoids common rounding problems when computers represent decimal values.
+---
 
-## Project workflow
+## Results
 
-The project is being built in stages:
+| Method | PR-AUC | Precision@100 | Recall@100 | Precision@500 | Recall@500 |
+|--------|--------|---------------|------------|---------------|------------|
+| Self-approved | 0.1079 | 0.23 | 0.1050 | 0.054 | 0.1233 |
+| Odd timing | 0.2302 | 0.50 | 0.2283 | 0.106 | 0.2420 |
+| Duplicate | 0.0869 | 0.36 | 0.1644 | 0.076 | 0.1735 |
+| Below limit | 0.1326 | 0.41 | 0.1872 | 0.086 | 0.1963 |
+| Benford's law | 0.0083 | 0.02 | 0.0091 | 0.010 | 0.0228 |
+| Round number | 0.1341 | 0.51 | 0.2329 | 0.110 | 0.2511 |
+| **Any rule (combined)** | **0.5515** | **0.69** | **0.3151** | **0.368** | **0.8402** |
+| Logistic Regression | 0.2576 | 0.51 | 0.2329 | 0.110 | 0.2511 |
+| Isolation Forest | 0.0143 | 0.00 | 0.0000 | 0.010 | 0.0228 |
+| XGBoost | 0.3340 | 0.61 | 0.2785 | 0.186 | 0.4247 |
+| Autoencoder | 0.1082 | 0.25 | 0.1142 | 0.118 | 0.2694 |
 
-1. Generate a clean synthetic ledger and check that entries balance.
-2. Add more realistic business behaviour, such as invoices, payroll, VAT, and month-end entries.
-3. Profile public spending data and use it to inform the synthetic expense amounts.
-4. Add known synthetic anomalies and keep a separate record of which entries were changed.
-5. Explore the data, build audit rules and features, and compare detection approaches.
+**Key finding**: Combining all 6 rules (PR-AUC=0.5515) outperforms individual methods and ML models, catching 84% of anomalies in the top 500 entries while maintaining 36.8% precision. XGBoost (PR-AUC=0.334) is the best ML model but lags the combined rules, suggesting domain knowledge encoded in rules is crucial for detecting specific fraud patterns.
 
-The anomaly-detection and machine-learning work is still in progress. The goal is to test methods against known, deliberately created examples, not to claim that a model can identify real fraud.
+---
 
-## Ledger generation and anomaly injection
+## Limitations
 
-AuditLens generates balanced synthetic journal entries for business events such as sales, expenses, payments, and payroll. An anomaly-injection script can create examples such as duplicate payments, entries posted at unusual times, self-approved entries, round-number expenses, and expenses posted to alternate accounts.
+**These results reflect detection of planted synthetic anomalies only**, not proven real-world fraud detection.
 
-Anomaly labels are stored separately from the ledger. Each label identifies the entry and records whether it is anomalous and, if so, its anomaly type. Keeping these labels separate prevents the known answers from being mixed into data used for detection.
+- **Synthetic data**: All anomalies were artificially injected following predefined rules. Real fraud is more diverse and may not match our patterns.
+- **Class imbalance**: The dataset contains far more normal entries (26,176) than anomalies (219, 0.83%). Metrics like precision and recall depend heavily on threshold choice.
+- **Fixed thresholds**: The approval limit (£10,000), Benford threshold (30% deviation), and other parameters were arbitrary design choices, not empirically derived from a real control environment.
+- **No external validation**: The models and rules have not been tested on real-world ledgers or validated by domain experts.
 
-## Audit rules and evaluation
+Any production deployment would require validation on real data before use.
 
-AuditLens applies accounting rules to flag journal entries that may deserve review. The rules look for unusual leading-digit patterns, duplicate payments, expenses near an approval limit, unusual posting times, self-approval, and round-number amounts. Each finding includes the entry ID, the rule that flagged it, and a human-readable reason.
+---
 
-The rule results are compared with the separate synthetic anomaly labels using precision, recall, and a rule-by-anomaly-type table. These metrics describe performance on the generated examples; they are not evidence of real-world fraud-detection performance.
+## Setup
 
-## Features
+### Requirements
+- Python 3.9+
+- pip
 
-Journal lines are collapsed to one row per entry, and each entry gets numeric features: amount (raw and log), number of lines, posting hour, weekend and month-end flags, and one-hot user and weekday columns. Four behaviour features compare an entry with the same user's or vendor's earlier entries: how far the amount is from the user's usual amounts, how typical the posting hour is for that user, how long since the user last posted to the same accounts, and how many earlier entries the vendor has. These use only earlier entries, so a feature never depends on data from after the entry was posted. Each feature is described in [the feature reference](docs/features.md).
-
-The feature table contains no label columns. It also has no approver or account-code features, so it carries no direct signal for self-approved entries or entries posted to an alternate expense account.
-
-## Models
-
-Four models score each entry, with higher scores meaning more unusual: logistic regression, an isolation forest, XGBoost, and an autoencoder. Logistic regression and XGBoost learn from the labels and weight the rare anomaly class. The isolation forest is unsupervised. The autoencoder is trained on normal entries only and scores an entry by how poorly it can reconstruct it.
-
-Entries are split by time: the first 70% of the date range is used for training, the next 15% for validation, and the last 15% for testing. The test split is kept for the final evaluation. Scores for every entry are written to `data/processed/scores.csv` with a column showing each entry's split.
-
-## Current project status
-
-The generator creates a two-year ledger using a fixed random seed. With the current settings, it creates 180,000 journal entries and 405,050 journal lines. The generated entries balance.
-
-The generator internally tracks open sales and purchase invoices so customer receipts and supplier payments can be matched to invoices. It also creates payroll, VAT settlement, depreciation, and accrual entries.
-
-A monthly seasonality factor is defined in the generator but is not currently applied when choosing sales events. The invoice-closure tests also need improvement. These are known follow-up items; they do not change the purpose of the Stage 3 spending profile.
-
-The Stage 3 analysis is in [the real-data profiling notebook](notebooks/00_real_data_profile.ipynb), with its written findings in [the profiling report](docs/real_data_profile.md).
-
-## Understanding `mu` and `sigma`
-
-The synthetic generator uses a **lognormal distribution** to create positive, right-skewed amounts: many transactions are around a typical size, while fewer transactions are much larger.
-
-In plain language:
-
-- `mu` controls the typical size of generated amounts. In this project, `mu` is on a logarithmic scale; it is not itself an amount in pounds.
-- `sigma` controls how spread out the amounts are. A larger `sigma` creates a wider range, including more very large values.
-
-The generator samples an amount with `rng.lognormvariate(mu, sigma)`, multiplies it by 100 to express it in pence, and stores the result as an integer. With this conversion, `exp(mu)` is approximately the median amount in pounds.
-
-The current settings are separate for sales and expenses:
-
-| Event type |  `mu` | `sigma` | Reason                                                                        |
-| ---------- | ----: | ------: | ----------------------------------------------------------------------------- |
-| Sales      |   6.0 |     1.0 | Kept at the original settings; the Defra spending data does not contain sales |
-| Expenses   | 11.35 |    1.45 | Adjusted using the Defra median and 95th percentile                           |
-
-The expense settings bring the synthetic median and 95th percentile close to the values in the selected real transactions. The synthetic coefficient of variation is still lower, which means the synthetic amounts have less relative variation overall. Matching all three statistics with one lognormal distribution would require a trade-off.
-
-## Real spending data
-
-The profiling analysis uses six Defra spending-over-£25,000 publications:
-
-- [September 2025](https://www.gov.uk/government/publications/defra-spending-over-25000-september-2025)
-- [October 2025](https://www.gov.uk/government/publications/defra-spending-over-25000-october-2025)
-- [November 2025](https://www.gov.uk/government/publications/defra-spending-over-25000-november-2025)
-- [December 2025](https://www.gov.uk/government/publications/defra-spending-over-25000-december-2025)
-- [January 2026](https://www.gov.uk/government/publications/defra-spending-over-25000-january-2026)
-- [February 2026](https://www.gov.uk/government/publications/defra-spending-over-25000-february-2026)
-
-The six files contain 5,513 rows. Source amounts are converted to integer pence for analysis. The positive real transactions and all synthetic expense entries compare as follows:
-
-| Metric                   | Positive Defra transactions (£) | Synthetic expense entries (£) |
-| ------------------------ | ------------------------------: | ----------------------------: |
-| Count                    |                           5,490 |                        45,050 |
-| Median                   |                       84,867.50 |                     84,631.82 |
-| 95th percentile          |                      916,157.23 |                    909,955.14 |
-| Coefficient of variation |                          10.486 |                         2.573 |
-
-This is a benchmark rather than a like-for-like comparison. Defra data includes government grants and capital spending, while the synthetic ledger represents a simplified company. The Defra publications are also subject to a spending threshold, so they do not represent all government spending.
-
-## Project structure
-
-- `src/ledger_audit/` contains the ledger generator, chart of accounts, validation, and modules for later analysis stages.
-- `scripts/` contains command-line scripts for generating data and running later project steps.
-- `tests/` contains automated checks for the implemented behaviour.
-- `notebooks/` contains data exploration and profiling.
-- `docs/` contains written findings and project documentation.
-- `data/raw/` and `data/processed/` are for generated or downloaded data and are excluded from Git.
-
-## Set up
-
-Run these commands from the project root. They create an isolated Python environment, install the project dependencies, and make the `ledger_audit` package importable.
+### Install
 
 ```bash
+# Clone the repository
+git clone https://github.com/greatdaveo/AuditLens.git
+cd AuditLens
+
+# Create virtual environment
 python -m venv .venv
-source .venv/bin/activate
-python -m pip install -r requirements.txt
-python -m pip install -e .
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+
+# Install package and dependencies
+pip install -e .
 ```
+
+### Run the Full Pipeline
+
+To generate data, train models, and evaluate all methods:
+
+```bash
+# 1. Generate a synthetic ledger with realistic patterns
+python scripts/generate_ledger.py
+
+# 2. Inject known anomalies (6 types at calibrated rates)
+python scripts/inject_anomalies.py
+
+# 3. Build 20+ features capturing accounting and behavioral patterns
+python scripts/build_features.py
+
+# 4. Run rule-based audit tests (6 audit rules)
+python scripts/run_rules.py
+
+# 5. Train 4 machine learning models
+python scripts/train_models.py
+
+# 6. Evaluate all methods on the test set and generate results
+python scripts/evaluate_all.py
+```
+
+Results are written to `docs/results.md` with a comparison table, per-anomaly-type breakdown, and professional analysis.
+
+### Explore Results
+
+View the top 20 most suspicious entries with human-readable explanations:
+
+```bash
+jupyter notebook notebooks/02_results.ipynb
+```
+
+This notebook shows each flagged entry's score, ground truth anomaly type, and a combined explanation of why it was flagged (from both audit rules and XGBoost's feature importance via SHAP).
+
+### Run Tests
+
+Verify everything works:
+
+```bash
+pytest -v
+```
+
+Tests run automatically on every push via GitHub Actions (see `.github/workflows/tests.yml`).
+
+---
+
+## Citation
+This is a learning project demonstrating hybrid anomaly detection (rule-based + ML).
+
+If you use this project, please cite:
+
+```bibtex
+@software{auditlens2026,
+  title={AuditLens: Anomaly Detection for Financial Ledgers},
+  author={David Olowomeye},
+  year={2026},
+  url={https://github.com/greatdaveo/AuditLens}
+}
+```
+
+---
+
+## Authors
+
+**[David Olowomeye](https://github.com/greatdaveo)**
+
+---
+
+## Acknowledgments
+
+- Bakumenko & Elragal (2022): "Detecting Anomalies in Financial Transactions"
+- Schreyer et al. (2017, 2019): "Graph-based Fraud Detection"
