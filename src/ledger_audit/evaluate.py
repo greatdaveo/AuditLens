@@ -1,5 +1,7 @@
+import shap
 import pandas as pd
 from sklearn.metrics import average_precision_score
+
 
 
 def evaluate_model(y_true, scores) -> dict:
@@ -75,3 +77,65 @@ def error_breakdown(y_true, scores, anomaly_type, k) -> pd.DataFrame:
         })
 
     return pd.DataFrame(results)
+
+
+def explain_xgboost(model, X, entry_ids, top_n=5) -> pd.DataFrame:
+    """Explain XGBoost predictions using SHAP values."""
+
+    explainer = shap.TreeExplainer(model)
+
+    shap_values = explainer.shap_values(X)
+
+    if isinstance(shap_values, list):
+        shap_values = shap_values[1]
+
+    reasons = []
+
+    for idx, entry_id in enumerate(entry_ids):
+        shap_abs = pd.Series(shap_values[idx]).abs()
+        top_indices = shap_abs.nlargest(top_n).index.tolist()
+
+        feature_explanations = []
+        for feature_idx in top_indices:
+            feature_name = X.columns[feature_idx]
+            feature_value = X.iloc[idx, feature_idx]
+            shap_value = shap_values[idx, feature_idx]
+
+            direction = "higher" if shap_value > 0 else "lower"
+            impact = abs(shap_value)
+
+            explanation = f"{feature_name}={feature_value:.1f} ({direction} than typical, impact={impact:.3f})"
+            feature_explanations.append(explanation)
+
+        combined_reason = "; ".join(feature_explanations)
+        reasons.append({
+            "entry_id": entry_id,
+            "shap_reason": combined_reason,
+        })
+
+    return pd.DataFrame(reasons)
+
+
+def combine_reasons(rule_reasons: pd.DataFrame, shap_reasons: pd.DataFrame) -> pd.DataFrame:
+    """ Combine rule-based reasons with SHAP-based reasons into one "why_flagged" field."""
+
+    combined = rule_reasons.merge(shap_reasons, on="entry_id", how="outer")
+
+    explanations = []
+    for _, row in combined.iterrows():
+        parts = []
+
+        if pd.notna(row.get("reason")):
+            parts.append(f"Rule: {row['reason']}")
+
+        if pd.notna(row.get("shap_reason")):
+            parts.append(f"Model: {row['shap_reason']}")
+
+        why_flagged = " ".join(parts) if parts else "Unknown reason"
+
+        explanations.append({
+            "entry_id": row["entry_id"],
+            "why_flagged": why_flagged,
+        })
+
+    return pd.DataFrame(explanations)
